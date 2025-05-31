@@ -73,6 +73,7 @@
   </div>
 <script>
 (() => {
+  const dpr = window.devicePixelRatio || 1;
   const nebulaCanvas = document.getElementById('nebula');
   const nebulaCtx = nebulaCanvas.getContext('2d');
   const starsCanvas = document.getElementById('stars');
@@ -104,12 +105,24 @@
   function resize() {
     width = window.innerWidth;
     height = window.innerHeight;
-    canvas.width = width;
-    canvas.height = height;
-    nebulaCanvas.width = width;
-    nebulaCanvas.height = height;
-    starsCanvas.width = width;
-    starsCanvas.height = height;
+    // Set CSS size
+    canvas.style.width = width + 'px';
+    canvas.style.height = height + 'px';
+    nebulaCanvas.style.width = width + 'px';
+    nebulaCanvas.style.height = height + 'px';
+    starsCanvas.style.width = width + 'px';
+    starsCanvas.style.height = height + 'px';
+    // Set actual drawing buffer size, accounting for dpr
+    canvas.width = width * dpr;
+    canvas.height = height * dpr;
+    nebulaCanvas.width = width * dpr;
+    nebulaCanvas.height = height * dpr;
+    starsCanvas.width = width * dpr;
+    starsCanvas.height = height * dpr;
+    // Scale contexts
+    ctx.scale(dpr, dpr);
+    nebulaCtx.scale(dpr, dpr);
+    starsCtx.scale(dpr, dpr);
     drawNebula();
     initStars();
   }

@@ -1,0 +1,592 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Chaotic Protoplanetary Disk with Fading Planet Traces</title>
+  <style>
+    body { margin:0; background:#000; color:#fff; font-family:sans-serif; overflow:hidden; }
+    canvas { display:block; position:absolute; top:0; left:0; }
+    #nebula { z-index: 0; }
+    #stars  { z-index: 1; }
+    #canvas { z-index: 2; }
+    #controls { position:absolute; top:10px; left:10px; z-index:10; background:rgba(0,0,0,.7); padding:10px; border-radius:8px; }
+    #controls input { width:80px; margin:2px 0; }
+    #controls label { display:block; margin-top:8px; }
+  </style>
+</head>
+<body>
+  <!-- Dark background canvas with bluish gradient -->
+  <canvas id="nebula"></canvas>
+  <!-- Twinkling star field canvas -->
+  <canvas id="stars"></canvas>
+  <!-- Main simulation canvas -->
+  <canvas id="canvas"></canvas>
+  <div id="controls">
+    <h3>Simulation Settings</h3>
+    <label>Particles: <input type="number" id="N" value="1000" min="100" max="10000"></label>
+    <label>G (Universal): <input type="number" id="G" value="1" step="0.1"></label>
+    <label>Planetary Gravity Factor: <input type="number" id="planetGFactor" value="1.2" step="0.12"></label>
+    <label>Initial Speed Factor: <input type="number" id="speedFactor" value="0.7" step="0.05"></label>
+    <label>Radius Factor: <input type="number" id="radiusFactor" value="4" step="0.1"></label>
+    <label>Merge Distance Factor: <input type="number" id="mergeDistFactor" value="0.5" step="0.1"></label>
+    <label>Merge Speed Threshold: <input type="number" id="mergeSpeedThreshold" value="5" step="0.05"></label>
+    <label>Hard Merge Factor: <input type="number" id="hardMergeFactor" value="0.3" step="0.05"></label>
+    <small>(If distance &lt; sum of radii * this factor, merge unconditionally)</small>
+    <label>Trace Radius Threshold: <input type="number" id="traceThreshold" value="5" step="1"></label>
+    <small>(Show trace for planets with radius &gt;= this value)</small>
+    <label>Sun Gravity Offset: <input type="number" id="sunOffset" value="400" step="10"></label>
+    <small>(Adds constant to sun-planet distance for gravity)</small>
+    <label>Moon Distance Factor: <input type="number" id="moonDistFactor" value="5" step="0.5"></label>
+    <small>(Min fraction of Hill radius to consider as moon)</small>
+    <label>dt (constant): <input type="number" id="dt" value="0.1" step="0.01"></label>
+    <small>(Use scroll over canvas to adjust)</small>
+    <button id="reset">Reset</button>
+  </div>
+<script>
+(() => {
+  const nebulaCanvas = document.getElementById('nebula');
+  const nebulaCtx = nebulaCanvas.getContext('2d');
+  const starsCanvas = document.getElementById('stars');
+  const starsCtx = starsCanvas.getContext('2d');
+  const canvas = document.getElementById('canvas');
+  const ctx    = canvas.getContext('2d');
+  let width, height;
+
+  // Star field parameters (twinkling effect added)
+  const numStars = 200;
+  const stars = [];
+  let starTime = 0;
+  let starAngle = 0;
+  const rotationSpeed = 0.00002; // radians per ms (slow rotation)
+
+  function resize() {
+    width = window.innerWidth;
+    height = window.innerHeight;
+    canvas.width = width;
+    canvas.height = height;
+    nebulaCanvas.width = width;
+    nebulaCanvas.height = height;
+    starsCanvas.width = width;
+    starsCanvas.height = height;
+    drawNebula();
+    initStars();
+  }
+
+  // Draw a dark bluish radial gradient background
+  function drawNebula() {
+    nebulaCtx.clearRect(0, 0, width, height);
+    const cx = width / 2;
+    const cy = height / 2;
+    const maxRadius = Math.max(width, height) / 2;
+    const grad = nebulaCtx.createRadialGradient(cx, cy, 0, cx, cy, maxRadius);
+    grad.addColorStop(0, '#000F1A'); // very dark bluish center
+    grad.addColorStop(1, '#000000'); // black at edges
+    nebulaCtx.fillStyle = grad;
+    nebulaCtx.fillRect(0, 0, width, height);
+  }
+
+  // Initialize star positions, properties, and twinkling parameters relative to center
+  function initStars() {
+    stars.length = 0;
+    for (let i = 0; i < numStars; i++) {
+      const x = (Math.random() - 0.5) * width;
+      const y = (Math.random() - 0.5) * height;
+      const radius = Math.random() * 0.8 + 0.2; // smaller radii
+      const twinklePhase = Math.random() * Math.PI * 2;
+      const twinkleSpeed = Math.random() * 0.005 + 0.002; // speed of twinkling
+      stars.push({ xRel: x, yRel: y, radius, twinklePhase, twinkleSpeed });
+    }
+    starAngle = 0;
+    starTime = 0;
+  }
+
+  // Draw, rotate, and apply twinkling effect to stars
+  function drawStars(delta) {
+    starTime += delta;
+    starAngle = starTime * rotationSpeed;
+    starsCtx.clearRect(0, 0, width, height);
+    const cosA = Math.cos(starAngle);
+    const sinA = Math.sin(starAngle);
+    const cx = width / 2;
+    const cy = height / 2;
+    stars.forEach(star => {
+      const xRot = star.xRel * cosA - star.yRel * sinA;
+      const yRot = star.xRel * sinA + star.yRel * cosA;
+      const x = cx + xRot;
+      const y = cy + yRot;
+      
+      // Twinkle: vary opacity with a sine wave
+      const twinkle = 0.5 + 0.5 * Math.sin(star.twinklePhase + starTime * star.twinkleSpeed);
+      const opacity = 0.3 + 0.7 * twinkle; // range between 0.3 and 1.0
+      
+      starsCtx.beginPath();
+      starsCtx.arc(x, y, star.radius, 0, 2 * Math.PI);
+      starsCtx.fillStyle = `rgba(255, 255, 255, ${opacity})`;
+      starsCtx.fill();
+    });
+  }
+
+  // Utility: convert hex color (e.g. "#aabbcc") to {r, g, b}
+  function hexToRgb(hex) {
+    const raw = hex.replace('#', '');
+    const num = parseInt(raw, 16);
+    const r = (num >> 16) & 0xFF;
+    const g = (num >> 8) & 0xFF;
+    const b = num & 0xFF;
+    return { r, g, b };
+  }
+
+  // Existing simulation code
+  const density = 5;
+  const maxTraceLength = 100;
+  const minPlanets = 50;
+  let nextId = 1;
+
+  class Body {
+    constructor(x, y, vx, vy, m, r, c) {
+      this.id = nextId++;
+      this.pos = { x, y };
+      this.vel = { x: vx, y: vy };
+      this.acc = { x: 0, y: 0 };
+      this.mass = m;
+      this.radius = r;
+      this.color = c;
+      this.trace = [];
+      this.moonTrace = [];
+    }
+  }
+
+  class Explosion {
+    constructor(x, y, normalX, normalY, intensity) {
+      this.particles = [];
+      const count = Math.floor(intensity * 10);
+      for (let i = 0; i < count; i++) {
+        const angleOffset = (Math.random() - 0.5) * Math.PI / 3;
+        const angle = Math.atan2(normalY, normalX) + angleOffset;
+        const speed = (Math.random() * 0.5 + 0.5) * intensity;
+        const vx = Math.cos(angle) * speed;
+        const vy = Math.sin(angle) * speed;
+        this.particles.push({ x, y, vx, vy, length: 5 + Math.random() * 5, ttl: 30 + Math.random() * 20 });
+      }
+    }
+
+    update() {
+      this.particles.forEach(p => {
+        p.x += p.vx;
+        p.y += p.vy;
+        p.ttl -= 1;
+      });
+      this.particles = this.particles.filter(p => p.ttl > 0);
+    }
+
+    draw(ctx) {
+      this.particles.forEach(p => {
+        const alpha = p.ttl / 50;
+        ctx.beginPath();
+        const vxNorm = p.vx / (Math.hypot(p.vx, p.vy) || 1);
+        const vyNorm = p.vy / (Math.hypot(p.vx, p.vy) || 1);
+        const x2 = p.x - vxNorm * p.length;
+        const y2 = p.y - vyNorm * p.length;
+        ctx.moveTo(p.x, p.y);
+        ctx.lineTo(x2, y2);
+        ctx.strokeStyle = `rgba(255, 255, 0, ${alpha})`;
+        ctx.lineWidth = 2;
+        ctx.stroke();
+      });
+    }
+  }
+
+  let bodies = [];
+  let explosions = [];
+  const orbitHistory = {};
+  const ORBIT_THRESHOLD = Math.PI * 2 * 2;
+
+  function randColor() {
+    return `#${Math.floor(Math.random() * 0xFFFFFF).toString(16).padStart(6, '0')}`;
+  }
+
+  function lightenColor(hex) {
+    const raw = hex.replace('#', '');
+    const num = parseInt(raw, 16);
+    let r = (num >> 16) & 0xFF;
+    let g = (num >> 8) & 0xFF;
+    let b = num & 0xFF;
+    r = Math.min(255, Math.floor(r + (255 - r) * 0.5));
+    g = Math.min(255, Math.floor(g + (255 - g) * 0.5));
+    b = Math.min(255, Math.floor(b + (255 - b) * 0.5));
+    const newHex = ((r << 16) | (g << 8) | b).toString(16).padStart(6, '0');
+    return `#${newHex}`;
+  }
+
+  function merge(i, j) {
+    const radF = +document.getElementById('radiusFactor').value;
+    const [Lidx, Sidx] = bodies[i].mass >= bodies[j].mass ? [i, j] : [j, i];
+    const L = bodies[Lidx];
+    const S = bodies[Sidx];
+    const mT = L.mass + S.mass;
+    L.vel.x = (L.vel.x * L.mass + S.vel.x * S.mass) / mT;
+    L.vel.y = (L.vel.y * L.mass + S.vel.y * S.mass) / mT;
+    L.mass = mT;
+    L.radius = Math.cbrt((3 * L.mass) / (4 * Math.PI * density)) * radF;
+    L.trace = L.trace.concat(S.trace).slice(-maxTraceLength);
+    delete orbitHistory[S.id];
+    L.moonTrace = L.moonTrace.concat(S.moonTrace).slice(-maxTraceLength);
+    bodies.splice(Sidx, 1);
+  }
+
+  function computeAccelerations() {
+    const G = +document.getElementById('G').value;
+    const gFactor = +document.getElementById('planetGFactor').value;
+    const mergeDistFactor = +document.getElementById('mergeDistFactor').value;
+    const hardMergeFactor = +document.getElementById('hardMergeFactor').value;
+    const mergeSpeedThreshold = +document.getElementById('mergeSpeedThreshold').value;
+    const sunOffset = +document.getElementById('sunOffset').value;
+
+    bodies.forEach(b => (b.acc.x = b.acc.y = 0));
+
+    for (let i = 0; i < bodies.length; i++) {
+      for (let j = i + 1; j < bodies.length; j++) {
+        const A = bodies[i];
+        const B = bodies[j];
+        let dx = B.pos.x - A.pos.x;
+        let dy = B.pos.y - A.pos.y;
+        let dist = Math.hypot(dx, dy) || 1e-9;
+        const sumR = A.radius + B.radius;
+
+        if ((i === 0 || j === 0) && dist < sumR) {
+          const idxPlanet = i === 0 ? j : i;
+          const planet = bodies[idxPlanet];
+          const normX = dx / dist;
+          const normY = dy / dist;
+          const sun = bodies[0];
+          const contactX = sun.pos.x + normX * sun.radius;
+          const contactY = sun.pos.y + normY * sun.radius;
+          const intensity = planet.radius / 5;
+          explosions.push(new Explosion(contactX, contactY, normX, normY, intensity));
+          bodies.splice(idxPlanet, 1);
+          return computeAccelerations();
+        }
+
+        if (i && j && dist < sumR * hardMergeFactor) {
+          merge(i, j);
+          return computeAccelerations();
+        }
+
+        const dvx = B.vel.x - A.vel.x;
+        const dvy = B.vel.y - A.vel.y;
+        const relSpeed = Math.hypot(dvx, dvy);
+
+        if (i && j && dist < sumR * mergeDistFactor && relSpeed < mergeSpeedThreshold) {
+          merge(i, j);
+          return computeAccelerations();
+        }
+
+        let effectiveDist = dist;
+        if (i === 0 || j === 0) {
+          effectiveDist = dist + sunOffset;
+        }
+
+        const m1 = i === 0 ? A.mass : A.mass * gFactor;
+        const m2 = j === 0 ? B.mass : B.mass * gFactor;
+        const f = (G * m1 * m2) / (effectiveDist * effectiveDist);
+        const fx = (f * dx) / effectiveDist;
+        const fy = (f * dy) / effectiveDist;
+
+        if (i) {
+          A.acc.x += fx / A.mass;
+          A.acc.y += fy / A.mass;
+        }
+        if (j) {
+          B.acc.x -= fx / B.mass;
+          B.acc.y -= fy / B.mass;
+        }
+      }
+    }
+  }
+
+  function detectMoons() {
+    const moons = [];
+    const moonFactor = +document.getElementById('moonDistFactor').value;
+    const sunOffset = +document.getElementById('sunOffset').value;
+    const sun = bodies[0];
+    const mSun = sun.mass;
+
+    bodies.forEach(b => {
+      if (b.id === sun.id) return;
+      let nearestPlanet = null;
+      let minDist = Infinity;
+      bodies.forEach(p => {
+        if (p.id === b.id || p.id === sun.id) return;
+        if ( p.mass <= b.mass) return;
+        const dx = b.pos.x - p.pos.x;
+        const dy = b.pos.y - p.pos.y;
+        const dist = Math.hypot(dx, dy);
+        if (dist < minDist) {
+          minDist = dist;
+          nearestPlanet = p;
+        }
+      });
+      if (!nearestPlanet) return;
+      const p = nearestPlanet;
+      const dxp = p.pos.x - sun.pos.x;
+      const dyp = p.pos.y - sun.pos.y;
+      const r_true = Math.hypot(dxp, dyp);
+      const r_p = r_true + sunOffset;
+      const R_H = r_p * Math.pow(p.mass / (3 * mSun), 1/3);
+      if (minDist < moonFactor * R_H) {
+        const angle = Math.atan2(b.pos.y - p.pos.y, b.pos.x - p.pos.x);
+        if (!orbitHistory[b.id] || orbitHistory[b.id].planetId !== p.id) {
+          orbitHistory[b.id] = { planetId: p.id, lastAngle: angle, accumulatedAngle: 0 };
+        } else {
+          const hist = orbitHistory[b.id];
+          let dAngle = angle - hist.lastAngle;
+          if (dAngle > Math.PI) dAngle -= 2 * Math.PI;
+          if (dAngle < -Math.PI) dAngle += 2 * Math.PI;
+          hist.accumulatedAngle += Math.abs(dAngle);
+          hist.lastAngle = angle;
+        }
+        const hist = orbitHistory[b.id];
+        if (hist.accumulatedAngle >= ORBIT_THRESHOLD) {
+          moons.push({ body: b });
+        }
+      } else {
+        delete orbitHistory[b.id];
+      }
+    });
+    return moons;
+  }
+
+  function step() {
+    const dt = +document.getElementById('dt').value;
+    computeAccelerations();
+    bodies.forEach((b, idx) => {
+      if (idx > 0) {
+        b.vel.x += 0.5 * b.acc.x * dt;
+        b.vel.y += 0.5 * b.acc.y * dt;
+      }
+    });
+    bodies.forEach((b, idx) => {
+      if (idx > 0) {
+        b.pos.x += b.vel.x * dt;
+        b.pos.y += b.vel.y * dt;
+      }
+    });
+    computeAccelerations();
+    bodies.forEach((b, idx) => {
+      if (idx > 0) {
+        b.vel.x += 0.5 * b.acc.x * dt;
+        b.vel.y += 0.5 * b.acc.y * dt;
+      }
+    });
+  }
+
+  function draw() {
+    ctx.clearRect(0, 0, width, height);
+    ctx.save();
+    ctx.translate(width / 2, height / 2);
+
+    const traceThreshold = +document.getElementById('traceThreshold').value;
+    // Draw fading planet traces
+    bodies.forEach((b, idx) => {
+      if (idx > 0 && b.radius >= traceThreshold && b.trace.length > 1) {
+        const trace = b.trace;
+        const n = trace.length;
+        const lightHex = lightenColor(b.color);
+        const { r, g, b: bb } = hexToRgb(lightHex);
+        for (let k = 1; k < n; k++) {
+          const p0 = trace[k - 1];
+          const p1 = trace[k];
+          // older points have lower alpha: k=1 -> small, k=n-1 -> near 1
+          const alpha = k / (n - 1);
+          ctx.beginPath();
+          ctx.moveTo(p0.x, p0.y);
+          ctx.lineTo(p1.x, p1.y);
+          ctx.strokeStyle = `rgba(${r}, ${g}, ${bb}, ${alpha})`;
+          ctx.lineWidth = 1;
+          ctx.setLineDash([]);
+          ctx.stroke();
+        }
+      }
+    });
+
+    // Draw the Sun
+    if (bodies.length > 0) {
+      const sun = bodies[0];
+      const sunX = sun.pos.x;
+      const sunY = sun.pos.y;
+      const sunR = sun.radius;
+      const gradient = ctx.createRadialGradient(sunX, sunY, 0, sunX, sunY, sunR);
+      gradient.addColorStop(0, '#ffffff');
+      gradient.addColorStop(0.4, '#fffae3');
+      gradient.addColorStop(0.8, '#ffdd55');
+      gradient.addColorStop(1, '#ffaa00');
+      ctx.beginPath();
+      ctx.arc(sunX, sunY, sunR, 0, 2 * Math.PI);
+      ctx.fillStyle = gradient;
+      ctx.fill();
+      const glow = ctx.createRadialGradient(sunX, sunY, sunR, sunX, sunY, sunR * 2);
+      glow.addColorStop(0, 'rgba(255, 204, 0, 0.5)');
+      glow.addColorStop(1, 'rgba(255, 204, 0, 0)');
+      ctx.beginPath();
+      ctx.arc(sunX, sunY, sunR * 2, 0, 2 * Math.PI);
+      ctx.fillStyle = glow;
+      ctx.fill();
+    }
+
+    // Draw and update planet bodies, storing trace points
+    bodies.forEach((b, idx) => {
+      if (idx === 0) return;
+      const traceThresholdVal = +document.getElementById('traceThreshold').value;
+      if (b.radius >= traceThresholdVal) {
+        b.trace.push({ x: b.pos.x, y: b.pos.y });
+        if (b.trace.length > maxTraceLength) b.trace.shift();
+      } else {
+        b.trace = [];
+      }
+      ctx.beginPath();
+      ctx.arc(b.pos.x, b.pos.y, b.radius, 0, 2 * Math.PI);
+      ctx.fillStyle = b.color;
+      ctx.setLineDash([]);
+      ctx.fill();
+    });
+
+    // Draw explosions
+    explosions.forEach((expl, idx) => {
+      expl.update();
+      expl.draw(ctx);
+      if (expl.particles.length === 0) explosions.splice(idx, 1);
+    });
+
+    // Detect moons and update moon traces
+    const moons = detectMoons();
+    const moonIds = new Set(moons.map(m => m.body.id));
+    bodies.forEach(b => {
+      if (moonIds.has(b.id)) {
+        b.moonTrace.push({ x: b.pos.x, y: b.pos.y });
+        if (b.moonTrace.length > maxTraceLength) b.moonTrace.shift();
+      } else {
+        b.moonTrace = [];
+      }
+    });
+
+    // Draw moon traces as solid dashed lines (no fading)
+    bodies.forEach(b => {
+      if (b.moonTrace.length > 1) {
+        ctx.beginPath();
+        const first = b.moonTrace[0];
+        ctx.moveTo(first.x, first.y);
+        for (let k = 1; k < b.moonTrace.length; k++) {
+          ctx.lineTo(b.moonTrace[k].x, b.moonTrace[k].y);
+        }
+        ctx.strokeStyle = '#ffffff';
+        ctx.lineWidth = 1;
+        ctx.setLineDash([4, 4]);
+        ctx.stroke();
+      }
+    });
+
+    ctx.restore();
+  }
+
+  function spawnPlanet() {
+    const radF = +document.getElementById('radiusFactor').value;
+    const sunOffset = +document.getElementById('sunOffset').value;
+    const G = +document.getElementById('G').value;
+    const spF = +document.getElementById('speedFactor').value;
+    const starM = bodies[0].mass;
+    const margin = 20;
+    let startX, startY, dx, dy, r, rad;
+    do {
+      startX = (Math.random() - 0.5) * width;
+      startY = -height/2 - margin;
+      dx = startX;
+      dy = startY;
+      r = Math.hypot(dx, dy);
+      const m = Math.random() * 2 + 0.5;
+      rad = Math.cbrt((3 * m) / (4 * Math.PI * density)) * radF;
+    } while (r < bodies[0].radius + rad);
+
+    const effectiveR = r + sunOffset;
+    const vC = Math.sqrt((G * starM * r) / (effectiveR * effectiveR)) * spF;
+    const vx = (-dy / (r || 1)) * vC;
+    const vy = (dx / (r || 1)) * vC;
+    bodies.push(new Body(startX, startY, vx, vy, Math.random() * 2 + 0.5, rad, randColor()));
+  }
+
+  function checkAndSpawn() {
+    const planetCount = bodies.length - 1;
+    if (planetCount < minPlanets) {
+      const toSpawn = minPlanets - planetCount;
+      for (let i = 0; i < toSpawn; i++) spawnPlanet();
+    }
+  }
+
+  let lastTime = 0;
+  function animate(time) {
+    const delta = time - lastTime;
+    lastTime = time;
+    drawNebula();
+    drawStars(delta);
+    step();
+    draw();
+    checkAndSpawn();
+    requestAnimationFrame(animate);
+  }
+
+  function initBodies() {
+    bodies.length = 0;
+    explosions.length = 0;
+    Object.keys(orbitHistory).forEach(id => delete orbitHistory[id]);
+    nextId = 1;
+    const N = +document.getElementById('N').value;
+    const G = +document.getElementById('G').value;
+    const spF = +document.getElementById('speedFactor').value;
+    const radF = +document.getElementById('radiusFactor').value;
+    const sunOffset = +document.getElementById('sunOffset').value;
+    const starM = 100000;
+    const starR = 30;
+
+    const sun = new Body(0, 0, 0, 0, starM, starR, 'yellow');
+    bodies.push(sun);
+    const Rmax = Math.min(width, height) / 2 - starR - 20;
+    for (let i = 0; i < N; i++) {
+      let x, y, rDist, mass, rad;
+      do {
+        const theta = Math.random() * 2 * Math.PI;
+        rDist = Math.random() * Rmax;
+        x = rDist * Math.cos(theta);
+        y = rDist * Math.sin(theta);
+        mass = Math.random() * 2 + 0.5;
+        rad = Math.cbrt((3 * mass) / (4 * Math.PI * density)) * radF;
+      } while (rDist < sun.radius + rad);
+      const effectiveR = rDist + sunOffset;
+      const vC = Math.sqrt((G * starM * rDist) / (effectiveR * effectiveR)) * spF;
+      const vx = -y / (rDist || 1) * vC;
+      const vy = x / (rDist || 1) * vC;
+      bodies.push(new Body(x, y, vx, vy, mass, rad, randColor()));
+    }
+  }
+
+  window.addEventListener('resize', resize);
+  document.getElementById('reset').addEventListener('click', initBodies);
+  canvas.addEventListener('wheel', (e) => {
+    e.preventDefault();
+    const dtInput = document.getElementById('dt');
+    let current = parseFloat(dtInput.value);
+    const step = parseFloat(dtInput.step) || 0.01;
+    if (e.deltaY < 0) {
+      current += step;
+    } else {
+      current = Math.max(step, current - step);
+    }
+    dtInput.value = current.toFixed(2);
+  });
+
+  resize();
+  initBodies();
+  requestAnimationFrame(animate);
+})();
+</script>
+</body>
+</html>

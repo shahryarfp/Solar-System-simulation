@@ -105,24 +105,25 @@
   function resize() {
     width = window.innerWidth;
     height = window.innerHeight;
-    // Set CSS size
-    canvas.style.width = width + 'px';
-    canvas.style.height = height + 'px';
-    nebulaCanvas.style.width = width + 'px';
-    nebulaCanvas.style.height = height + 'px';
-    starsCanvas.style.width = width + 'px';
-    starsCanvas.style.height = height + 'px';
-    // Set actual drawing buffer size, accounting for dpr
-    canvas.width = width * dpr;
+    // Set CSS size (logical pixels)
+    [canvas, nebulaCanvas, starsCanvas].forEach(c => {
+      c.style.width = width + 'px';
+      c.style.height = height + 'px';
+    });
+
+    // Set drawing buffer size (actual pixels)
+    canvas.width  = width * dpr;
     canvas.height = height * dpr;
-    nebulaCanvas.width = width * dpr;
+    nebulaCanvas.width  = width * dpr;
     nebulaCanvas.height = height * dpr;
-    starsCanvas.width = width * dpr;
+    starsCanvas.width  = width * dpr;
     starsCanvas.height = height * dpr;
-    // Scale contexts
-    ctx.scale(dpr, dpr);
-    nebulaCtx.scale(dpr, dpr);
-    starsCtx.scale(dpr, dpr);
+
+    // Reset and scale contexts so coordinates are in logical pixels
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    nebulaCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    starsCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
     drawNebula();
     initStars();
   }
@@ -171,8 +172,8 @@
       const y = cy + yRot;
       
       // Twinkle: vary opacity with a sine wave
-      const twinkle = 0.5 + 0.5 * Math.sin(star.twinklePhase + starTime * star.twinkleSpeed);
-      const opacity = 0.3 + 0.7 * twinkle; // range between 0.3 and 1.0
+      const tw = 0.5 + 0.5 * Math.sin(star.twinklePhase + starTime * star.twinkleSpeed);
+      const opacity = 0.3 + 0.7 * tw; // range between 0.3 and 1.0
       
       starsCtx.beginPath();
       starsCtx.arc(x, y, star.radius, 0, 2 * Math.PI);
@@ -191,7 +192,7 @@
     return { r, g, b };
   }
 
-  // Existing simulation code
+  // Simulation variables
   const density = 5;
   const maxTraceLength = 100;
   const minPlanets = 50;
@@ -441,7 +442,6 @@
     ctx.translate(width / 2, height / 2);
 
     const traceThreshold = +document.getElementById('traceThreshold').value;
-    // Draw fading planet traces
     bodies.forEach((b, idx) => {
       if (idx > 0 && b.radius >= traceThreshold && b.trace.length > 1) {
         const trace = b.trace;
@@ -451,7 +451,6 @@
         for (let k = 1; k < n; k++) {
           const p0 = trace[k - 1];
           const p1 = trace[k];
-          // older points have lower alpha: k=1 -> small, k=n-1 -> near 1
           const alpha = k / (n - 1);
           ctx.beginPath();
           ctx.moveTo(p0.x, p0.y);
@@ -464,7 +463,6 @@
       }
     });
 
-    // Draw the Sun
     if (bodies.length > 0) {
       const sun = bodies[0];
       const sunX = sun.pos.x;
@@ -488,7 +486,6 @@
       ctx.fill();
     }
 
-    // Draw and update planet bodies, storing trace points
     bodies.forEach((b, idx) => {
       if (idx === 0) return;
       const traceThresholdVal = +document.getElementById('traceThreshold').value;
@@ -505,14 +502,12 @@
       ctx.fill();
     });
 
-    // Draw explosions
     explosions.forEach((expl, idx) => {
       expl.update();
       expl.draw(ctx);
       if (expl.particles.length === 0) explosions.splice(idx, 1);
     });
 
-    // Detect moons and update moon traces
     const moons = detectMoons();
     const moonIds = new Set(moons.map(m => m.body.id));
     bodies.forEach(b => {
@@ -524,7 +519,6 @@
       }
     });
 
-    // Draw moon traces as solid dashed lines (no fading)
     bodies.forEach(b => {
       if (b.moonTrace.length > 1) {
         ctx.beginPath();

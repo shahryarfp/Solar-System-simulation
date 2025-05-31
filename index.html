@@ -10,7 +10,33 @@
     #nebula { z-index: 0; }
     #stars  { z-index: 1; }
     #canvas { z-index: 2; }
-    #controls { position:absolute; top:10px; left:10px; z-index:10; background:rgba(0,0,0,.7); padding:10px; border-radius:8px; }
+    /* Toggle button styling */
+    #toggleControls {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      z-index: 11;
+      padding: 8px 12px;
+      background: rgba(255,255,255,0.1);
+      color: #fff;
+      border: 1px solid #fff;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 14px;
+    }
+    #controls {
+      position:absolute;
+      top:50px;
+      left:10px;
+      z-index:10;
+      background:rgba(0,0,0,.7);
+      padding:10px;
+      border-radius:8px;
+      display: none; /* hidden initially */
+      max-height: 90vh;
+      overflow-y: auto;
+      width: 200px;
+    }
     #controls input { width:80px; margin:2px 0; }
     #controls label { display:block; margin-top:8px; }
   </style>
@@ -22,6 +48,8 @@
   <canvas id="stars"></canvas>
   <!-- Main simulation canvas -->
   <canvas id="canvas"></canvas>
+  <!-- Button to toggle controls visibility -->
+  <button id="toggleControls">Show Controls</button>
   <div id="controls">
     <h3>Simulation Settings</h3>
     <label>Particles: <input type="number" id="N" value="900" min="100" max="10000"></label>
@@ -51,7 +79,20 @@
   const starsCtx = starsCanvas.getContext('2d');
   const canvas = document.getElementById('canvas');
   const ctx    = canvas.getContext('2d');
+  const toggleBtn = document.getElementById('toggleControls');
+  const controls = document.getElementById('controls');
   let width, height;
+
+  // Toggle controls visibility
+  toggleBtn.addEventListener('click', () => {
+    if (controls.style.display === 'none') {
+      controls.style.display = 'block';
+      toggleBtn.textContent = 'Hide Controls';
+    } else {
+      controls.style.display = 'none';
+      toggleBtn.textContent = 'Show Controls';
+    }
+  });
 
   // Star field parameters (twinkling effect added)
   const numStars = 200;

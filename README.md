@@ -6,7 +6,3 @@ A minimal, browser-based N-body demo where particles orbit a central star, colli
 
 **Live Demo:**  
 https://shahryarfp.github.io/Solar-System-simulation/
-
-**How to Use:**  
-- Open `index.html` in any modern browser (or visit the live link above).  
-- Tweak parameters in the on-screen control panel (Particles, G, speed, etc.) and click **Reset** to apply.

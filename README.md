@@ -1,6 +1,6 @@
 # Solar-System-simulation
 
-![Simulation Screenshot](screenshot.png)
+![Simulation Screenshot](sample.png)
 
 A minimal, browser-based N-body demo where particles orbit a central star, collide, and form “planets” and moonlets with fading orbital traces.
 

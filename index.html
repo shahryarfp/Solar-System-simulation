@@ -24,7 +24,7 @@
   <canvas id="canvas"></canvas>
   <div id="controls">
     <h3>Simulation Settings</h3>
-    <label>Particles: <input type="number" id="N" value="1000" min="100" max="10000"></label>
+    <label>Particles: <input type="number" id="N" value="900" min="100" max="10000"></label>
     <label>G (Universal): <input type="number" id="G" value="1" step="0.1"></label>
     <label>Planetary Gravity Factor: <input type="number" id="planetGFactor" value="1.2" step="0.12"></label>
     <label>Initial Speed Factor: <input type="number" id="speedFactor" value="0.7" step="0.05"></label>
@@ -33,13 +33,13 @@
     <label>Merge Speed Threshold: <input type="number" id="mergeSpeedThreshold" value="5" step="0.05"></label>
     <label>Hard Merge Factor: <input type="number" id="hardMergeFactor" value="0.3" step="0.05"></label>
     <small>(If distance &lt; sum of radii * this factor, merge unconditionally)</small>
-    <label>Trace Radius Threshold: <input type="number" id="traceThreshold" value="5" step="1"></label>
+    <label>Trace Radius Threshold: <input type="number" id="traceThreshold" value="4" step="1"></label>
     <small>(Show trace for planets with radius &gt;= this value)</small>
     <label>Sun Gravity Offset: <input type="number" id="sunOffset" value="400" step="10"></label>
     <small>(Adds constant to sun-planet distance for gravity)</small>
     <label>Moon Distance Factor: <input type="number" id="moonDistFactor" value="5" step="0.5"></label>
     <small>(Min fraction of Hill radius to consider as moon)</small>
-    <label>dt (constant): <input type="number" id="dt" value="0.1" step="0.01"></label>
+    <label>dt (constant): <input type="number" id="dt" value="0.15" step="0.01"></label>
     <small>(Use scroll over canvas to adjust)</small>
     <button id="reset">Reset</button>
   </div>

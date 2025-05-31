@@ -10,8 +10,3 @@ https://shahryarfp.github.io/Solar-System-simulation/
 **How to Use:**  
 - Open `index.html` in any modern browser (or visit the live link above).  
 - Tweak parameters in the on-screen control panel (Particles, G, speed, etc.) and click **Reset** to apply.
-
-**Screenshot:**  
-Place a file named `screenshot.png` (e.g. a capture of the running sim) in the repo root so that it appears above.
-
-**License:** MIT

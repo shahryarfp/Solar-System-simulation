@@ -5,7 +5,14 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Chaotic Protoplanetary Disk with Fading Planet Traces</title>
   <style>
-    body { margin:0; background:#000; color:#fff; font-family:sans-serif; overflow:hidden; }
+    body {
+      margin: 0;
+      background: #000;
+      color: #fff;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; /* Nicer sans-serif stack */
+      overflow: hidden;
+      min-height: 100vh; /* Ensure it covers viewport */
+    }
     canvas { display:block; position:absolute; top:0; left:0; }
     #nebula { z-index: 0; }
     #stars  { z-index: 1; }
@@ -13,32 +20,77 @@
     /* Toggle button styling */
     #toggleControls {
       position: absolute;
-      top: 10px;
-      right: 10px;
+      top: 15px; /* Slightly more padding from top */
+      right: 15px; /* Slightly more padding from right */
       z-index: 11;
-      padding: 8px 12px;
-      background: rgba(255,255,255,0.1);
-      color: #fff;
-      border: 1px solid #fff;
-      border-radius: 4px;
+      padding: 10px 15px; /* Slightly larger padding */
+      background: rgba(50, 50, 80, 0.5); /* Darker, slightly bluish translucent background */
+      color: #e0e0e0; /* Lighter grey text */
+      border: 1px solid rgba(255, 255, 255, 0.3); /* Softer border */
+      border-radius: 6px; /* More rounded corners */
       cursor: pointer;
       font-size: 14px;
+      transition: background-color 0.3s, color 0.3s; /* Smooth transition for hover */
+    }
+    #toggleControls:hover {
+      background: rgba(70, 70, 100, 0.7); /* Slightly lighter on hover */
+      color: #fff;
     }
     #controls {
-      position:absolute;
-      top:50px;
-      left:10px;
-      z-index:10;
-      background:rgba(0,0,0,.7);
-      padding:10px;
-      border-radius:8px;
+      position: absolute;
+      top: 60px; /* Adjusted to be below the new button position */
+      left: 15px; /* More padding from edge */
+      z-index: 10;
+      background: rgba(30, 30, 50, 0.85); /* Darker, more opaque, bluish background */
+      padding: 15px; /* More internal padding */
+      border-radius: 8px;
       display: none; /* hidden initially */
-      max-height: 90vh;
+      max-height: calc(100vh - 80px); /* Ensure it doesn't go off-screen */
       overflow-y: auto;
-      width: 200px;
+      width: 220px; /* Slightly wider for better spacing */
+      border: 1px solid rgba(255, 255, 255, 0.2); /* Subtle border */
+      box-shadow: 0 4px 15px rgba(0,0,0,0.3); /* Soft shadow for depth */
     }
-    #controls input { width:80px; margin:2px 0; }
-    #controls label { display:block; margin-top:8px; }
+    #controls h3 {
+      margin-top: 0;
+      margin-bottom: 15px;
+      color: #b0c4de; /* Light steel blue for header */
+      text-align: center;
+      font-size: 16px;
+    }
+    #controls label {
+      display: block;
+      margin-top: 10px;
+      font-size: 13px; /* Slightly smaller label font */
+      color: #ccc;
+    }
+    #controls input[type="number"] {
+      width: 60px; /* Adjust width if needed */
+      padding: 6px 8px;
+      margin: 4px 0 8px 0; /* More space around input */
+      background: rgba(0,0,0,0.3);
+      color: #fff;
+      border: 1px solid rgba(255,255,255,0.2);
+      border-radius: 4px;
+      font-size: 13px;
+    }
+    #controls button#reset {
+      display: block; /* Center button */
+      margin: 15px auto 5px auto; /* Auto margins for centering */
+      padding: 8px 15px;
+      background: rgba(80, 80, 120, 0.6);
+      color: #e0e0e0;
+      border: 1px solid rgba(255, 255, 255, 0.3);
+      border-radius: 4px;
+      cursor: pointer;
+      transition: background-color 0.3s, color 0.3s;
+    }
+    #controls button#reset:hover {
+      background: rgba(100, 100, 140, 0.8);
+      color: #fff;
+    }
+    /* Hide all controls except particles, dt, G, and speedFactor */
+    .hidden-control { display: none; }
   </style>
 </head>
 <body>
@@ -52,23 +104,25 @@
   <button id="toggleControls">Show Controls</button>
   <div id="controls">
     <h3>Simulation Settings</h3>
-    <label>Particles: <input type="number" id="N" value="900" min="100" max="10000"></label>
-    <label>G (Universal): <input type="number" id="G" value="1" step="0.1"></label>
-    <label>Planetary Gravity Factor: <input type="number" id="planetGFactor" value="1.2" step="0.12"></label>
-    <label>Initial Speed Factor: <input type="number" id="speedFactor" value="0.7" step="0.05"></label>
-    <label>Radius Factor: <input type="number" id="radiusFactor" value="4" step="0.1"></label>
-    <label>Merge Distance Factor: <input type="number" id="mergeDistFactor" value="0.5" step="0.1"></label>
-    <label>Merge Speed Threshold: <input type="number" id="mergeSpeedThreshold" value="5" step="0.05"></label>
-    <label>Hard Merge Factor: <input type="number" id="hardMergeFactor" value="0.3" step="0.05"></label>
-    <small>(If distance &lt; sum of radii * this factor, merge unconditionally)</small>
-    <label>Trace Radius Threshold: <input type="number" id="traceThreshold" value="4" step="1"></label>
-    <small>(Show trace for planets with radius &gt;= this value)</small>
-    <label>Sun Gravity Offset: <input type="number" id="sunOffset" value="400" step="10"></label>
-    <small>(Adds constant to sun-planet distance for gravity)</small>
-    <label>Moon Distance Factor: <input type="number" id="moonDistFactor" value="5" step="0.5"></label>
-    <small>(Min fraction of Hill radius to consider as moon)</small>
-    <label>dt (constant): <input type="number" id="dt" value="0.15" step="0.01"></label>
-    <small>(Use scroll over canvas to adjust)</small>
+    <!-- Visible: Initial Particles -->
+    <label>Initial Particles: <input type="number" id="N" value="900" step="10" min="10" max="1000"></label>
+    <!-- Visible: Initial Speed Factor -->
+    <label>Initial Speed Factor: <input type="number" id="speedFactor" value="0.7" step="0.05" min="0" max="2"></label>
+    <!-- Visible: G (Universal Gravitational Constant) -->
+    <label>G (Universal): <input type="number" id="G" value="1" step="0.1" min="0" max="10"></label>
+    <!-- Visible: dt (constant) -->
+    <label>dt (constant): <input type="number" id="dt" value="0.15" step="0.01" min="0" max="1"></label>
+    <!-- Hidden controls kept for internal use -->
+    <div class="hidden-control">
+      <input type="number" id="planetGFactor" value="1.2" step="0.12">
+      <input type="number" id="radiusFactor" value="4" step="0.1">
+      <input type="number" id="mergeDistFactor" value="0.5" step="0.1">
+      <input type="number" id="mergeSpeedThreshold" value="5" step="0.05">
+      <input type="number" id="hardMergeFactor" value="0.3" step="0.05">
+      <input type="number" id="traceThreshold" value="4" step="1">
+      <input type="number" id="sunOffset" value="400" step="10">
+      <input type="number" id="moonDistFactor" value="5" step="0.5">
+    </div>
     <button id="reset">Reset</button>
   </div>
 <script>
@@ -84,9 +138,10 @@
   const controls = document.getElementById('controls');
   let width, height;
 
-  // Toggle controls visibility
+  // Toggle controls visibility using computed style
   toggleBtn.addEventListener('click', () => {
-    if (controls.style.display === 'none') {
+    const currentDisplay = getComputedStyle(controls).display;
+    if (currentDisplay === 'none') {
       controls.style.display = 'block';
       toggleBtn.textContent = 'Hide Controls';
     } else {

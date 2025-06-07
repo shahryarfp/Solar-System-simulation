@@ -64,15 +64,6 @@ Over time, these simple rules let the system self-organize into a collection of 
 
 ---
 
-## How to Run
-
-1. Clone or download this repository.
-2. Open `index.html` in any modern web browser.
-3. Use the **Show Controls** button to reveal sliders and input fields.
-4. Adjust settings to your taste, then click **Reset** to restart the simulation with your new parameters.
-
----
-
 ## Available Controls
 
 - **Initial Particles**: Number of small bodies to start with (50–1000).  

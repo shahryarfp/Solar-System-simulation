@@ -15,7 +15,7 @@ This interactive simulation recreates a tiny “solar system” in your browser.
 
 - Particles swirl and settle into orbit around the star.
 - Close encounters and gentle collisions allow particles to stick together and grow into planet-like bodies.
-- Some bodies develop small companions—moonlets—that trace their own faint paths.
+- Some bodies develop small moonlets that trace their own faint paths.
 - Rare, head-on collisions with the star create bright “explosions” of debris.
 
 It’s a dynamic dance of gravity, motion, and merging that plays out in vivid color.
